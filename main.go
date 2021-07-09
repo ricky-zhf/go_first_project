@@ -4,45 +4,46 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"text/template"
+	"time"
 )
 
-type UserInfo struct {
-	Name   string
-	Gender string
-	Age    int
+//定义一个中间件，统计请求处理函数的耗时
+func m1(c *gin.Context) {
+	fmt.Println("go into m1...")
+	start := time.Now()
+	//c.Set("name", "小王子") // 可以通过c.Set在请求上下文中设置值，后续的处理函数能够取到该值
+	//c.Next()//执行当前请求的后续的操作
+	c.Abort() //不调用后续处理请求的函数,但是会执行完当前函数。
+	//如果不想执行当前函数后续流程需要使用return
+	cost := time.Since(start) // 计算耗时
+	fmt.Println("time costs", cost)
 }
-
+func m2(c *gin.Context) {
+	fmt.Println("go into m2")
+	c.Next()
+	fmt.Println("exit m2")
+}
 func main() {
 	r := gin.Default()
-	//解析模板文件
-	r.LoadHTMLFiles("templates/index.tmpl")
-	//渲染模板文件，访问index时，调用func函数。
+	r.Use(m1, m2, authMiddleware()) //全局注册中间件
 	r.GET("/index", func(c *gin.Context) {
-		//写返回值，写返回好的渲染文件,没有通过define命名是需要默认的文件名
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			//gin.H本质上就是一个map[string]interface{}
-			"title": "rickyyy.com",
+		fmt.Println("indexhandler...")
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "index",
 		})
 	})
-	r.Run(":9090") //启动server
+	r.Run(":9090")
 }
-func sayHello(w http.ResponseWriter, r *http.Request) {
-	//定义模板
-	//解析模板,路径中的点代表项目所在目录
-	t, err := template.ParseFiles("./index.tmpl")
-	if err != nil {
-		fmt.Println("parse tamplate failed, err:", err)
-	}
-	//渲染模板,execute第一个值是解析出来的模板要返回给io。第二个代表传什么数据。
-	// 利用给定数据渲染模板，并将结果写入w
-	user := UserInfo{
-		Name:   "rickyyyy",
-		Gender: "男",
-		Age:    25,
-	}
-	err = t.Execute(w, user)
-	if err != nil {
-		fmt.Println("render template failed, err:", err)
+
+//通常中间件不会写成函数的形式，而是使用闭包来实现。
+func authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		/*判断当前用户是否登录的中间件
+		if 用户已登录 {
+			c.Next()
+		} else {
+			c.Abort()
+		}
+		*/
 	}
 }
